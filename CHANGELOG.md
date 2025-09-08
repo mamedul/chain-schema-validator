@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/ "null"), and this project adheres to a `YYYY.MM.DD{patch}` format.
 
+
+## [2025.9.8-2] - 2025-09-08
+
+### Added
+
+*   **String-Specific Methods**: Newly added `.ip4()`,  `.ip6()`,  `.ip()`,  `.email()`.
+
+### Update/Fixed
+
+*  **Validations system**
+
 ## [2025.9.8] - 2025-09-08
 
 ### Newly Built & Published
@@ -23,6 +34,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/ "
     *   **Array**: Newly added `.items(schema)`, `.unique()`, `.has(schema)`, `.single()`.
         
     *   **Object**: Newly enhanced `schema.object()` for nested validation and deep schema composition.
+
+    
+*   Newly added advanced logical rules: `.xor`, `.with`, `.without`.
+    
+*   Newly introduced data "fixer" methods: `.toLowerCase`, `.truncate`, `.replace`.
+    
+*   Newly built number and string validators: `.integer`, `.positive`, `.alphanum`, `.guid`.
+
         
 *   **Enhanced Error and Value Handling**: Newly implemented `.validate()` and `.validateAsync()` methods on `schema.object()` return a consistent `{ value, error }` object.
 
@@ -33,15 +52,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/ "
 *   Removed old object-level logical rules (`.or`, `.xor`, `.with`, etc.) and introduced a more powerful custom validation approach.
     
 *   Reorganized all validation methods by data type (e.g., `.min()` now behaves differently depending on whether it’s on a string, number, or array schema).
-
-## [2025.9.8.7] - 2025-09-08
-
-### Newly Built & Added
-
-*   Newly added advanced logical rules: `.xor`, `.with`, `.without`.
-    
-*   Newly introduced data "fixer" methods: `.toLowerCase`, `.truncate`, `.replace`.
-    
-*   Newly built number and string validators: `.integer`, `.positive`, `.alphanum`, `.guid`.
 
 _For older changes, see previous versions._

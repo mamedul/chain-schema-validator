@@ -1,6 +1,6 @@
 {
   "name": "chain-schema-validator",
-  "version": "2025.9.8",
+  "version": "2025.9.8-2",
   "description": "The perfect, feature-complete, chainable schema-based object validator for Node.js and browsers. Inspired by Joi.",
   "main": "index.js",
   "module": "index.mjs",
