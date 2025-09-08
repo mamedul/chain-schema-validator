@@ -142,6 +142,8 @@ if (error) {
 
 This library is now feature-complete and in a stable state. Bug reports are welcome. Please see our [Security Policy](./SECURITY.md "null").
 
+If you need just object validator, then you can see  [objectPropValidator](https://github.com/mamedul/objectpropvalidator "null").
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE "null") file for details.
