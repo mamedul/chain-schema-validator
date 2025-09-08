@@ -118,7 +118,7 @@ if (error) {
 
 *   **Transformation:** `.trim()`, `.lowercase()`, `.uppercase()`
     
-*   **Validation:** `.min(len)`, `.max(len)`, `.length(len)`, `.pattern(regex)`, `.creditCard()`, `.ip()`, `.uuid()`, `.hex()`, `.token()`, `.isoDate()`
+*   **Validation:** `.min(len)`, `.max(len)`, `.length(len)`, `.pattern(regex)`, `.creditCard()`, `.email()`, `.ip4()`, `.ip6()`, `.ip()`, `.uuid()`, `.hex()`, `.token()`, `.isoDate()`
     
 
 ### 🟢 Number-Specific Methods
