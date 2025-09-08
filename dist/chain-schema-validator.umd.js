@@ -31,25 +31,29 @@
 	const resolveRef = (value, obj) => (value && value.isRef ? obj[value.key] : value);
 	const isPresent = val => val !== undefined && val !== null;
 	const creditCardCheck = (num) => {
-	    let arr = (num + '').split('').reverse().map(x => parseInt(x));
-	    let lastDigit = arr.splice(0, 1)[0];
-	    let sum = arr.reduce((acc, val, i) => (i % 2 !== 0 ? acc + val : acc + ((val *= 2) > 9 ? val - 9 : val)), 0);
-	    return (sum + lastDigit) % 10 === 0;
+	    if (/[^0-9-\s]+/.test(num)) return false;
+	    let nCheck = 0, bEven = false;
+	    num = num.replace(/\D/g, "");
+	    for (var n = num.length - 1; n >= 0; n--) {
+	        var cDigit = num.charAt(n),
+	            nDigit = parseInt(cDigit, 10);
+	        if (bEven && (nDigit *= 2) > 9) nDigit -= 9;
+	        nCheck += nDigit;
+	        bEven = !bEven;
+	    }
+	    return (nCheck % 10) == 0;
 	};
 
-	// --- Main Validator Class ---
+	// --- Field Validator Class ---
 	class Validator {
 	    constructor(type) {
 	        this._type = type;
 	        this._rules = [];
 	        this._transformers = [];
-	        this._flags = {
-	            optional: true,
-	            nullable: false,
-	            strip: false
-	        };
+	        this._flags = { optional: true, nullable: false, strip: false };
 	        this._meta = {};
 	        this._hasAsync = false;
+	        this._schemaObject = null; // For object().keys()
 	    }
 
 	    // --- General / Utility Methods ---
@@ -66,17 +70,22 @@
 	    transform(fn) { this.addTransformer(fn); return this; }
 	    custom(fn, msg) { this.addRule('custom', fn, msg || 'failed custom validation'); return this; }
 	    customAsync(fn, msg) { this._hasAsync = true; this.addRule('customAsync', fn, msg || 'failed async validation'); return this; }
-	    concat(schema) { this._rules.push(...schema._rules); this._transformers.push(...schema._transformers); return this; }
+	    concat(schema) { this._rules.push(...schema._rules); this._transformers.push(...schema._transformers); this._hasAsync = this._hasAsync || schema._hasAsync; return this; }
 	    meta(info) { this._meta = { ...this._meta, ...info }; return this; }
 	    message(customMessage) { if (this._rules.length > 0) { this._rules[this._rules.length - 1].customMessage = customMessage; } return this; }
-
+	    
+	    // --- String & Number Shared ---
+	    min(limit) { this.addRule('min', (v, o) => (typeof v === 'number' ? v >= resolveRef(limit, o) : v.length >= resolveRef(limit, o)), `must be at least ${limit.isRef ? `{${limit.key}}` : limit}`); return this; }
+	    max(limit) { this.addRule('max', (v, o) => (typeof v === 'number' ? v <= resolveRef(limit, o) : v.length <= resolveRef(limit, o)), `must be at most ${limit.isRef ? `{${limit.key}}` : limit}`); return this; }
+	    length(limit) { this.addRule('length', (v, o) => v.length === resolveRef(limit, o), `length must be exactly ${limit.isRef ? `{${limit.key}}` : limit}`); return this; }
+	    
 	    // --- String-Specific Methods ---
 	    pattern(regex, msg) { this.addRule('pattern', v => regex.test(v), msg || 'fails to match pattern'); return this; }
-	    min(limit) { this.addRule('min', (v, o) => v.length >= resolveRef(limit, o), `length must be at least ${limit.isRef ? `{${limit.key}}` : limit}`); return this; }
-	    max(limit) { this.addRule('max', (v, o) => v.length <= resolveRef(limit, o), `length must be at most ${limit.isRef ? `{${limit.key}}` : limit}`); return this; }
-	    length(limit) { this.addRule('length', (v, o) => v.length === resolveRef(limit, o), `length must be exactly ${limit.isRef ? `{${limit.key}}` : limit}`); return this; }
 	    creditCard() { this.addRule('creditCard', creditCardCheck, 'must be a valid credit card number'); return this; }
-	    ip() { this.addRule('ip', v => /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(v), 'must be a valid IP address'); return this; }
+	    ip4() { this.addRule('ip4', v => /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(v), 'must be a valid IPv4 address'); return this; }
+	    ip6() { this.addRule('ip6', v => /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/.test(v), 'must be a valid IPv6 address'); return this; }
+	    ip() { this.addRule('ip', v => ipv4Regex.test(v) || ipv6Regex.test(v), 'must be a valid IP address'); return this; }
+	    email() { this.addRule('email', v => typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'must be a valid email.'); return this; }
 	    uuid() { this.addRule('uuid', v => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v), 'must be a valid UUID'); return this; }
 	    hex() { this.addRule('hex', v => /^[a-fA-F0-9]+$/.test(v), 'must be a hexadecimal string'); return this; }
 	    token() { this.addRule('token', v => /^[a-zA-Z0-9_]+$/.test(v), 'must be a valid token'); return this; }
@@ -84,6 +93,7 @@
 	    trim() { this.addTransformer(v => typeof v === 'string' ? v.trim() : v); return this; }
 	    lowercase() { this.addTransformer(v => typeof v === 'string' ? v.toLowerCase() : v); return this; }
 	    uppercase() { this.addTransformer(v => typeof v === 'string' ? v.toUpperCase() : v); return this; }
+	    alphanum() { this.addRule('alphanum', v => /^[a-zA-Z0-9]+$/.test(v), 'must only contain alphanumeric characters.'); return this; }
 
 	    // --- Number-Specific Methods ---
 	    greater(limit) { this.addRule('greater', (v, o) => v > resolveRef(limit, o), `must be greater than ${limit.isRef ? `{${limit.key}}` : limit}`); return this; }
@@ -102,107 +112,256 @@
 	    // --- Object-Specific Methods ---
 	    keys(schemaObject) { this._schemaObject = schemaObject; return this; }
 	    
+	    // Add this inside the ObjectValidator class
+	    assert(path, schema, message) { 
+	        this.objectRules.push({ type: 'assert', path, schema, message }); 
+	        return this; 
+	    }
+
+	    
 	    // --- Internal Helpers ---
 	    addRule(type, validate, message, options) { this._rules.push({ type, validate, message, options }); }
 	    addTransformer(transform) { this._transformers.push(transform); }
 
-	    // --- Main Validation Logic ---
-	    async _validate(value, originalObj) {
-	        if (this._flags.strip) return { value: undefined, error: null };
-	        if (!isPresent(value)) {
-	            if (!this._flags.optional) return { error: 'is required' };
-	            return { value, error: null };
-	        }
-	        if (this._flags.nullable && value === null) return { value: null, error: null };
-
+	    // --- Internal SYNC Validation Logic ---
+	    _validateSync(value, originalObj) {
+	        if (this._hasAsync) throw new Error('Schema has async rules, use .validateAsync() instead.');
+	        
 	        let currentValue = value;
 	        for (const transformer of this._transformers) {
 	            currentValue = transformer(currentValue);
 	        }
-	        
-	        for (const rule of this._rules) {
-	            let isValid;
-	            if (rule.type === 'customAsync') {
-	                isValid = await rule.validate(currentValue, originalObj);
-	            } else {
-	                isValid = rule.validate(currentValue, originalObj);
-	            }
-	            if (!isValid) return { error: rule.customMessage || rule.message };
-	        }
 
-	        // Type-specific logic
-	        if (this._type === 'array' && this._rules.some(r => r.type === 'items')) {
-	            const itemSchema = this._rules.find(r => r.type === 'items').options.schema;
+	        if ( typeof this._flags.strip !== 'undefined' && this._flags.strip) return { value: undefined };
+	        if (!isPresent(currentValue)) {
+	            if (!this._flags.optional) throw new Error('is required');
+	            return { value: currentValue };
+	        }
+	        if (this._flags.nullable && currentValue === null) return { value: null };
+
+	        for (const rule of this._rules) {
+	            if (!rule.validate(currentValue, originalObj)) {
+	                throw new Error(rule.customMessage || rule.message);
+	            }
+	        }
+	        
+	        const itemsRule = this._rules.find(r => r.type === 'items');
+	        if (this._type === 'array' && itemsRule) {
+	            const itemSchema = itemsRule.options.schema;
+	            if (!Array.isArray(currentValue)) throw new Error('must be an array'); // Added type check here
 	            const validatedArray = [];
 	            for (let i = 0; i < currentValue.length; i++) {
-	                const { value: itemValue, error: itemError } = await itemSchema._validate(currentValue[i], originalObj);
-	                if(itemError) return { error: `[at index ${i}] ${itemError}` };
-	                if(!itemSchema._flags.strip) validatedArray.push(itemValue);
+	                // This is the core of the fix. It now correctly calls the item's own validator.
+	                const { value: itemValue, error: itemError } = itemSchema.validate(currentValue[i]);
+	                if(itemError) throw new Error(`[at index ${i}] ${itemError.details[0].message}`);
+	                
+	                // Correctly handles stripped items by checking if the returned value is undefined.
+	                if (itemValue !== undefined) {
+	                    validatedArray.push(itemValue);
+	                }
 	            }
 	            currentValue = validatedArray;
 	        }
 
-	        if (this._type === 'object' && this._schemaObject) {
-	            const { value: objValue, error: objError } = await schema.object(this._schemaObject)._validateObject(currentValue);
-	             if(objError) return { error: objError.details.map(d => `${d.field}: ${d.message}`).join(', ')}
+	        if ((this._type === 'object' || this._type === 'any') && this._schemaObject) {
+	            const { value: objValue, error: objError } = schema.object(this._schemaObject).validate(currentValue);
+	            if(objError) throw new Error(objError.details.map(d => `${d.field}: ${d.message}`).join(', '));
 	            currentValue = objValue;
 	        }
 	        
-	        return { value: currentValue, error: null };
+	        return { value: currentValue };
+	    }
+
+	    // --- Internal ASYNC Validation Logic ---
+	    async _validateAsync(value, originalObj) {
+	        let currentValue = value;
+	        for (const transformer of this._transformers) {
+	            currentValue = transformer(currentValue);
+	        }
+
+	        if (this._flags.strip) return { value: undefined };
+	        if (!isPresent(currentValue)) {
+	            if (!this._flags.optional) throw new Error('is required');
+	            return { value: currentValue };
+	        }
+	        if (this._flags.nullable && currentValue === null) return { value: null };
+
+	        for (const rule of this._rules) {
+	            const isValid = await Promise.resolve(rule.validate(currentValue, originalObj));
+	            if (!isValid) throw new Error(rule.customMessage || rule.message);
+	        }
+
+	        const itemsRule = this._rules.find(r => r.type === 'items');
+	        if (this._type === 'array' && itemsRule) {
+	            const itemSchema = itemsRule.options.schema;
+	            currentValue = await Promise.all(currentValue.map(async (item, i) => {
+	                const { value: itemValue, error: itemError } = await itemSchema.validateAsync(item);
+	                if(itemError) throw new Error(`[at index ${i}] ${itemError.details[0].message}`);
+	                return typeof itemSchema._flags.strip !== 'undefined' && itemSchema._flags.strip ? undefined : itemValue;
+	            })).then(results => results.filter(v => v !== undefined));
+	        }
+	        
+	        if ((this._type === 'object' || this._type === 'any') && this._schemaObject) {
+	            const { value: objValue, error: objError } = await schema.object(this._schemaObject).validateAsync(currentValue);
+	            if(objError) throw new Error(objError.details.map(d => `${d.field}: ${d.message}`).join(', '));
+	            currentValue = objValue;
+	        }
+	        
+	        return { value: currentValue };
+	    }
+	    
+	    // --- Public Facing Methods for individual field validation ---
+	    validate(value) {
+	        try {
+	            const { value: validatedValue } = this._validateSync(value, {});
+	            return { value: validatedValue, error: null };
+	        } catch (error) {
+	            return { value, error: new ValidationError([{ message: error.message }]) };
+	        }
+	    }
+
+	    async validateAsync(value) {
+	        try {
+	            const { value: validatedValue } = await this._validateAsync(value, {});
+	            return { value: validatedValue, error: null };
+	        } catch (error) {
+	            return { value, error: new ValidationError([{ message: error.message }]) };
+	        }
 	    }
 	}
 
+	// --- Object Validator Class ---
 	class ObjectValidator {
-	    constructor(schemaObject, options = {}) {
-	        this.schema = schemaObject;
+	    constructor(schemaMap, options = {}) {
+	        this.schemaMap = schemaMap;
 	        this.options = { abortEarly: true, stripUnknown: false, ...options };
-	        this.hasAsync = Object.values(schemaObject).some(s => s._hasAsync);
+	        this.objectRules = [];
+	        this.hasAsync = Object.values(schemaMap).some(s => s._hasAsync);
 	    }
 	    
-	    async _validateObject(obj) {
+	    or(...peers) { this.objectRules.push({ type: 'or', peers }); return this; }
+	    and(...peers) { this.objectRules.push({ type: 'and', peers }); return this; }
+	    xor(...peers) { this.objectRules.push({ type: 'xor', peers }); return this; }
+	    with(key, peers) { this.objectRules.push({ type: 'with', key, peers }); return this; }
+	    without(key, peers) { this.objectRules.push({ type: 'without', key, peers }); return this; }
+
+	    _checkObjectRules(obj, errors) {
+	        for (const rule of this.objectRules) {
+	            try {
+	                const presentPeers = rule.peers.filter(p => isPresent(obj[p]));
+	                if (rule.type === 'or' && presentPeers.length === 0) throw new Error(`At least one of [${rule.peers.join(', ')}] is required.`);
+	                if (rule.type === 'and' && presentPeers.length > 0 && presentPeers.length !== rule.peers.length) throw new Error(`All of [${rule.peers.join(', ')}] are required when one is present.`);
+	                if (rule.type === 'xor' && presentPeers.length !== 1) throw new Error(`Exactly one of [${rule.peers.join(', ')}] is required.`);
+	                if (rule.type === 'with' && isPresent(obj[rule.key]) && presentPeers.length !== rule.peers.length) throw new Error(`'${rule.key}' requires all of [${rule.peers.join(', ')}].`);
+	                if (rule.type === 'without' && isPresent(obj[rule.key]) && presentPeers.length > 0) throw new Error(`'${rule.key}' forbids any of [${rule.peers.join(', ')}].`);
+	                if (rule.type === 'assert') {
+	                    const resolvePath = (obj, path) => path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj);
+	                    const value = resolvePath(obj, rule.path);
+	                    const { error } = rule.schema.validate(value);
+	                    if (error) {
+	                        const defaultMessage = `path '${rule.path}' failed validation: ${error.details[0].message}`;
+	                        throw new Error(rule.message || defaultMessage);
+	                    }
+	                }
+	            } catch(err) {
+	                 errors.push({ message: err.message, field: rule.peers.join('|'), type: rule.type });
+	                 if (this.options.abortEarly) throw new ValidationError(errors);
+	            }
+	        }
+	    }
+	    
+	    _validateObjectSync(obj) {
+	        if (this.hasAsync) throw new Error('Schema has async rules, use .validateAsync() instead.');
+	        
 	        const validatedObj = {};
 	        const errors = [];
-	        const allKeys = new Set([...Object.keys(obj), ...Object.keys(this.schema)]);
+	        const initialObj = obj || {};
+
+	        let workingObj = { ...initialObj };
+	        if (this.options.stripUnknown) {
+	            const knownKeys = new Set(Object.keys(this.schemaMap));
+	            workingObj = Object.keys(workingObj).filter(key => knownKeys.has(key)).reduce((acc, key) => ({...acc, [key]: workingObj[key]}), {});
+	        }
+
+	        const allKeys = new Set([...Object.keys(workingObj), ...Object.keys(this.schemaMap)]);
 
 	        for (const key of allKeys) {
-	            const fieldSchema = this.schema[key];
-	            const value = obj[key];
+	            const fieldSchema = this.schemaMap[key];
+	            const value = workingObj[key];
 	            
 	            if (!fieldSchema) {
-	                if (!this.options.stripUnknown) validatedObj[key] = value;
+	                validatedObj[key] = value;
 	                continue;
 	            }
 
-	            const { value: validatedValue, error } = await fieldSchema._validate(value, obj);
+	            const { value: validatedValue, error } = fieldSchema.validate(value);
 	            
 	            if (error) {
-	                errors.push({ field: key, message: error, type: 'field' });
+	                errors.push({ field: key, message: error.details[0].message, type: 'field' });
 	                if (this.options.abortEarly) throw new ValidationError(errors);
 	            }
 	            
-	            if(!fieldSchema._flags.strip) {
+	            if(!(typeof fieldSchema._flags.strip !== "undefined" && fieldSchema._flags.strip)) {
 	               validatedObj[key] = validatedValue;
 	            }
 	        }
+	        
+	        this._checkObjectRules(validatedObj, errors);
+
 	        if (errors.length > 0) throw new ValidationError(errors);
 	        return { value: validatedObj, error: null };
 	    }
-	    
-	    async validateAsync(obj) {
+
+	    async _validateObjectAsync(obj) {
+	        const validatedObj = {};
+	        const errors = [];
+	        const initialObj = obj || {};
+
+	        let workingObj = { ...initialObj };
+	        if (this.options.stripUnknown) {
+	            const knownKeys = new Set(Object.keys(this.schemaMap));
+	            workingObj = Object.keys(workingObj).filter(key => knownKeys.has(key)).reduce((acc, key) => ({...acc, [key]: workingObj[key]}), {});
+	        }
+	        
+	        const allKeys = new Set([...Object.keys(workingObj), ...Object.keys(this.schemaMap)]);
+	        for (const key of allKeys) {
+	            const fieldSchema = this.schemaMap[key];
+	            const value = workingObj[key];
+
+	            if (!fieldSchema) {
+	                validatedObj[key] = value;
+	                continue;
+	            }
+	            
+	            const { value: validatedValue, error } = await fieldSchema.validateAsync(value);
+	            
+	            if (error) {
+	                errors.push({ field: key, message: error.details[0].message, type: 'field' });
+	                if (this.options.abortEarly) throw new ValidationError(errors);
+	            }
+	            
+	            if(!(typeof fieldSchema._flags.strip !== 'undefined' && fieldSchema._flags.strip)) {
+	               validatedObj[key] = validatedValue;
+	            }
+	        }
+	        
+	        this._checkObjectRules(validatedObj, errors);
+
+	        if (errors.length > 0) throw new ValidationError(errors);
+	        return { value: validatedObj, error: null };
+	    }
+
+	    validate(obj) {
 	        try {
-	            return await this._validateObject(obj);
+	            return this._validateObjectSync(obj);
 	        } catch(error) {
 	            return { value: obj, error };
 	        }
 	    }
 
-	    validate(obj) {
-	        if (this.hasAsync) throw new Error('Schema has async rules, use validateAsync()');
-	        let result;
-	        let syncError;
-	        this.validateAsync(obj).then(res => result = res).catch(err => syncError = { value: obj, error: err });
-	        if(syncError) return syncError;
-	        return result;
+	    async validateAsync(obj) {
+	        try { return await this._validateObjectAsync(obj); }
+	        catch(error) { return { value: obj, error }; }
 	    }
 	}
 
@@ -212,7 +371,7 @@
 	    number: () => new Validator('number'),
 	    boolean: () => new Validator('boolean'),
 	    array: () => new Validator('array'),
-	    object: (schemaObject, options) => new ObjectValidator(schemaObject, options),
+	    object: (schemaMap, options) => new ObjectValidator(schemaMap, options),
 	    date: () => new Validator('date'),
 	    any: () => new Validator('any'),
 	};

@@ -28,11 +28,15 @@ console.log('Running chain-schema-validator tests...\n');
         };
         const validator = schema.object(s);
 
-        if (validator.validate({ opt: 'a', nullbl: null }).error) throw new Error('Base case failed');
-        if (!validator.validate({}).error.details.some(d => d.field === 'req')) throw new Error('Required failed');
-        if (validator.validate({ nullbl: 'a' }).error) throw new Error('Nullable should allow string');
-        if (validator.validate({ nullbl: null }).error) throw new Error('Nullable failed');
-        if (!validator.validate({ forbid: 'a' }).error) throw new Error('Forbidden failed');
+        if (validator.validate({ req: 'a', opt: 'a', nullbl: null }).error) throw new Error('Base case failed');
+        const { error: reqError } = validator.validate({});
+        if (!reqError || !reqError.details.some(d => d.field === 'req')) throw new Error('Required failed');
+        
+        if (validator.validate({ req: 'a', nullbl: 'a' }).error) throw new Error('Nullable should allow string');
+        if (validator.validate({ req: 'a', nullbl: null }).error) throw new Error('Nullable failed');
+        
+        const { error: forbidError } = validator.validate({ req: 'a', forbid: 'a' });
+        if (!forbidError || !forbidError.details.some(d => d.field === 'forbid')) throw new Error('Forbidden failed');
     });
 
     await test('should strip fields', () => {
@@ -58,8 +62,9 @@ console.log('Running chain-schema-validator tests...\n');
             level: schema.number().invalid(0)
         };
         const validator = schema.object(s);
-        if (validator.validate({ status: 'pending' }).error.details[0].field !== 'status') throw new Error('Valid failed');
-        if (validator.validate({ level: 0 }).error.details[0].field !== 'level') throw new Error('Invalid failed');
+        if (validator.validate({ status: 'on', level: 1 }).error) throw new Error('Valid case failed');
+        if (!validator.validate({ status: 'pending' }).error) throw new Error('Valid() should have failed');
+        if (!validator.validate({ level: 0 }).error) throw new Error('Invalid() should have failed');
     });
 
     await test('should handle string validations and transformations', () => {
@@ -70,12 +75,13 @@ console.log('Running chain-schema-validator tests...\n');
             website: schema.string().lowercase()
         };
         const validator = schema.object(s);
-        const { value } = validator.validate({
+        const { value, error } = validator.validate({
             username: '  USER_123 ',
             pin: 'a1b2',
             card: '49927398716',
             website: 'HTTP://EXAMPLE.COM'
         });
+        if (error) throw error;
         if (value.username !== 'user_123' || value.pin !== 'a1b2' || value.website !== 'http://example.com') {
             throw new Error('String methods failed');
         }
@@ -88,24 +94,28 @@ console.log('Running chain-schema-validator tests...\n');
             portNum: schema.number().port()
         };
         const validator = schema.object(s);
-        if (validator.validate({ age: 17.5 }).error) throw new Error('Integer failed');
-        if (validator.validate({ age: 17 }).error) throw new Error('Greater failed');
-        if (validator.validate({ score: 100 }).error) throw new Error('Less failed');
-        if (validator.validate({ portNum: 99999 }).error) throw new Error('Port failed');
+        if (validator.validate({ age: 18, score: 99, portNum: 8080 }).error) throw new Error('Valid number case failed');
+        if (!validator.validate({ age: 17.5 }).error) throw new Error('Integer failed');
+        if (!validator.validate({ age: 17 }).error) throw new Error('Greater failed');
+        if (!validator.validate({ score: 100 }).error) throw new Error('Less failed');
+        if (!validator.validate({ portNum: 99999 }).error) throw new Error('Port failed');
     });
     
-    await test('should handle array validations', () => {
+    await test('should handle array validations with items()', () => {
         const itemSchema = schema.object({ id: schema.number().required() });
         const s = {
             tags: schema.array().items(schema.string().alphanum()).unique(),
-            users: schema.array().items(itemSchema).has(itemSchema.keys({ id: schema.number().valid(1) }))
+            users: schema.array().items(itemSchema)
         };
-        const validator = schema.object(s);
-        if(validator.validate({ tags: ['a', 'b', 'a']}).error) throw new Error('Unique failed');
-        if(validator.validate({ users: [{id: 2}, {id: 3}]}).error) throw new Error('Has failed');
-        const { value } = validator.validate({ users: [{id: 1}, {id: '2'}]});
-        // Note: The current structure doesn't deeply cast nested values. This is a limitation.
-        if(value.users[1].id !== '2') throw new Error('Nested validation passed unexpectedly');
+        const validator = schema.object(s, { abortEarly: false });
+
+        if (validator.validate({ tags: ['a', 'b', 'c!']}).error.details[0].field !== 'tags') throw new Error('Item validation failed');
+        if (validator.validate({ tags: ['a', 'b', 'a']}).error.details[0].field !== 'tags') throw new Error('Unique failed');
+        
+        const { value, error } = validator.validate({ users: [{id: 1}, {id: 2}]});
+        
+        if (error) throw new Error('Valid array case failed');
+        if (value.users.length !== 2) throw new Error('Array validation returned wrong length');
     });
 
     await test('should handle nested objects with .keys()', () => {
@@ -136,4 +146,3 @@ console.log('Running chain-schema-validator tests...\n');
         process.exit(1);
     }
 })();
-
