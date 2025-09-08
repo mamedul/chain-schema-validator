@@ -1,0 +1,57 @@
+{
+  "name": "chain-schema-validator",
+  "version": "2025.9.8",
+  "description": "The perfect, feature-complete, chainable schema-based object validator for Node.js and browsers. Inspired by Joi.",
+  "main": "index.js",
+  "module": "index.mjs",
+  "browser": "dist/chain-schema-validator.umd.js",
+  "scripts": {
+    "test": "node test.js",
+    "build": "rollup -c",
+    "build:minify": "cross-env NODE_ENV=production rollup -c",
+    "docs:serve": "docsify serve .",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "index.js",
+    "index.mjs",
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mamedul/chain-schema-validator.git"
+  },
+  "keywords": [
+    "validator",
+    "schema",
+    "joi",
+    "validation",
+    "perfect validator",
+    "object validation",
+    "chainable",
+    "async",
+    "conditional",
+    "transform",
+    "keys",
+    "switch",
+    "assert",
+    "ip",
+    "uuid",
+    "creditCard"
+  ],
+  "author": "MAMEDUL ISLAM <http://mamedul.github.io>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mamedul/chain-schema-validator/issues"
+  },
+  "homepage": "https://mamedul.github.io/chain-schema-validator",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "docsify-cli": "^4.4.4",
+    "cross-env": "^10.0.0",
+    "rollup": "^4.9.6"
+  }
+}
+
